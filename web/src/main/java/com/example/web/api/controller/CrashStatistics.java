@@ -17,7 +17,7 @@ public class CrashStatistics {
     @NotBlank(message = "months不能为空")
     private String months;
 
-    @NotNull(message = "systemCode不能为空")
-    @NotBlank(message = "systemCode不能为空")
-    private String systemCode;
+    @NotNull(message = "client不能为空")
+    @NotBlank(message = "client不能为空")
+    private String client;
 }

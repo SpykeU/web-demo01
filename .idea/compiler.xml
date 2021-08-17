@@ -12,13 +12,9 @@
         <module name="web-demo01" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="service" target="1.8" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
-      <module name="service" options="-parameters" />
       <module name="web" options="-parameters" />
     </option>
   </component>
