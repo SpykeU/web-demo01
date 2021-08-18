@@ -24,41 +24,13 @@ import org.elasticsearch.search.sort.SortOrder;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms.Bucket;
 
+import javax.validation.Valid;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
-//import org.elasticsearch.action.bulk.BulkRequestBuilder;
-//import org.elasticsearch.action.bulk.BulkResponse;
-//import org.elasticsearch.action.search.SearchRequestBuilder;
-//import org.elasticsearch.index.query.BoolQueryBuilder;
-//import org.elasticsearch.index.query.QueryBuilders;
-//import org.elasticsearch.action.delete.DeleteResponse;
-//import org.elasticsearch.action.get.GetResponse;
-//import org.elasticsearch.action.get.MultiGetItemResponse;
-//import org.elasticsearch.action.get.MultiGetResponse;
-//import org.elasticsearch.action.index.IndexRequest;
-//import org.elasticsearch.action.index.IndexResponse;
-//import org.elasticsearch.action.search.SearchResponse;
-//import org.elasticsearch.action.search.SearchType;
-//import org.elasticsearch.action.update.UpdateRequest;
-//import org.elasticsearch.action.update.UpdateResponse;
-//import org.elasticsearch.client.transport.TransportClient;
-//import org.elasticsearch.cluster.node.DiscoveryNode;
-//import org.elasticsearch.common.settings.Settings;
-//import org.elasticsearch.common.text.Text;
-//import org.elasticsearch.common.xcontent.XContentBuilder;
-//import org.elasticsearch.common.xcontent.XContentFactory;
-//import org.elasticsearch.search.SearchHit;
-//import org.elasticsearch.search.SearchHits;
-
-//import org.elasticsearch.search.aggregations.metrics.sum.Sum;
-//import org.elasticsearch.search.aggregations.AggregationBuilders;
-//import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-//import org.elasticsearch.search.sort.SortOrder;
 
 /********
  * 一定时间内没有崩溃数据的应用、版本、build信息
@@ -77,7 +49,7 @@ public class App
 //    private static final String user = "jiesi-avatar-yingyan";
 //    private static final String password = "0503777B248A1065";
 
-    private static final String esHosts = "192.168.1.7:9300";
+    private static final String esHosts = "127.0.0.1:9300";
 
     private static final String name = "elasticsearch";
     private static final String user = "";
@@ -129,25 +101,28 @@ public class App
     }
 
 
-    public static void main(String[] args) throws Exception {
+    public Object getCrashAppStatistics(CrashAppStats crashAppStats) {
         BoolQueryBuilder queryBuilder1 = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery("client", "apple"))
-                .filter(QueryBuilders.rangeQuery("createTime").gte("now-" + Integer.toString(3) +  "M"));
-        Map<String, Object> result1 = testSearch(queryBuilder1);
+                .filter(QueryBuilders.termQuery("client", crashAppStats.getClient()))
+                .filter(QueryBuilders.rangeQuery("createTime").gte("now-" + crashAppStats.getMonths() +  "M"));
+        Map<String, Set<String>> result1 = testSearch(queryBuilder1);
 
         BoolQueryBuilder queryBuilder2 = QueryBuilders.boolQuery()
-                .filter(QueryBuilders.termQuery("client", "apple"))
-                .filter(QueryBuilders.rangeQuery("createTime").lt("now-" + Integer.toString(3) +  "M"));
-        Map<String, Object> result2 = testSearch(queryBuilder2);
+                .filter(QueryBuilders.termQuery("client", crashAppStats.getClient()))
+                .filter(QueryBuilders.rangeQuery("createTime").lt("now-" + crashAppStats.getMonths() +  "M"));
+        Map<String, Set<String>> result2 = testSearch(queryBuilder2);
 
         System.out.println(result1);
         System.out.println(result2);
 
-        for (Map.Entry<String, Object> appEntry : result2.entrySet()) {
-            for (Map.Entry<String, Object> versionEntry : ((Map<String, Object>)result2.get(appEntry.getKey())).entrySet()) {
-
+        for (Map.Entry<String, Set<String>> appEntry : result2.entrySet()) {
+            if (result1.containsKey(appEntry.getKey())) {
+                result2.get(appEntry.getKey()).removeAll(result1.get(appEntry.getKey()));
             }
         }
+
+        System.out.println(result2);
+        return result2;
     }
 
     /**
@@ -188,8 +163,7 @@ public class App
      * client 客户端类型：android、client
      * @author suliri1
      */
-    public static Map<String, Object> testSearch(BoolQueryBuilder queryBuilder) {
-
+    public static Map<String, Set<String>> testSearch(BoolQueryBuilder queryBuilder) {
         SearchResponse searchResponse = esClient
                 .prepareSearch("app_crash_yingyan_simplify_data_*")
                 .setTypes("simplify_data")
@@ -206,21 +180,19 @@ public class App
 
         // 转为Map
         Terms appTerms = searchResponse.getAggregations().get("app");
-        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Set<String>> result = new LinkedHashMap<>();
         for (Terms.Bucket appBucket : appTerms.getBuckets()) {
             String appKey = appBucket.getKey().toString();
             Terms versionTerms = appBucket.getAggregations().get("version");
-            Map<String, Object> versionList = new LinkedHashMap<>();
+            Set<String> set = new LinkedHashSet<>();
             for (Terms.Bucket versionBucket : versionTerms.getBuckets()) {
                 String versionKey = versionBucket.getKey().toString();
                 Terms buildTerms = versionBucket.getAggregations().get("build");
-                List<String> buildList = new LinkedList<>();
                 for (Terms.Bucket buildBucket : buildTerms.getBuckets()) {
-                    buildList.add(buildBucket.getKey().toString());
+                    set.add(versionKey + "-" + buildBucket.getKey().toString());
                 }
-                versionList.put(versionKey, buildList);
             }
-            result.put(appKey, versionList);
+            result.put(appKey, set);
         }
         return result;
     }
